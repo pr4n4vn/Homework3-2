@@ -1,0 +1,218 @@
+---
+title: "Homework3-2"
+format: html
+editor: visual
+---
+
+## Task 1
+
+### 1) If your working directory is myfolder/homework/, what relative path would you specify to get the file located at myfolder/MyData.csv?
+
+read.csv(myfolder/Mydata.csv)
+
+### 2) What are the major benefits of using R projects?
+
+The major benefit of using R projects is the usage of relative paths.
+
+### 3) What is git and what is github?
+
+Git is open source and installed locally, whereas github is on a website database.
+
+### 4) What are the two main differences between a tibble and a data.frame?
+
+Tibbles have all variable types, and cannot partially match.
+
+### 5) Rewrite the following nested function call using baseR’s chaining operator:
+
+```{r}
+library(dplyr)
+iris_tbl <- as_tibble(iris) |>
+  select(starts_with("Petal"), Species) |>
+  filter(Petal.Length < 1.55) |>
+  arrange(Species)
+```
+
+### 6) What is meant by long format data and wide format data? Which do we generally prefer for statistical analysis?
+
+Long format data is when one row represents one observation, whereas wide is one column represents one observation. For statistical analysis, long format data is preferred.
+
+## Task 2 - Glass Data
+
+```{r}
+library (tidyverse)
+library(readr)
+library(dplyr)
+library(Lahman)
+#1
+
+#read in the raw data file named glass data, and put in column names.
+glass_data <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/glass.data",
+                          delim = ",",
+                          col_names = c("Id", "RI", "Na", "Mg", "Al", "Si", "K", "Ca", "Ba", "Fe"))
+
+glass_data
+
+#2
+
+#overwrite last column with character strings 
+glass_data_tbl <- as_tibble(glass_data)
+glass_data_tbl |>
+  mutate(desc = ifelse(glass_data_tbl$X11 == 1, "building_windows_float_processed",
+              ifelse(glass_data_tbl$X11 == 2, "bulding_windows_non_float_processed",
+              ifelse(glass_data_tbl$X11 == 3, "vehicle_windows_float_processed",
+              ifelse(glass_data_tbl$X11 == 4, "vehicle_windows_non_float_processed",
+              ifelse(glass_data_tbl$X11 == 5, "containers",
+              ifelse(glass_data_tbl$X11 == 6, "tableware", "headlamps"))))))) |>
+#3
+  #continue the chain and filter based on requirements.
+  filter(Fe < 0.2, desc %in% c("tableware", "headlamps"))
+
+print(glass_data_tbl)
+
+```
+
+## Task 2 - Yeast Data
+
+```{r}
+library(readr)
+#1 - Read in raw delimited data and create column names based on HW requirements.
+columnnames = c("seq_name", 
+                "mcg",
+                "gvh", 
+                "alm", 
+                "mit", 
+                "erl",
+                "pox",
+                "vac",
+                "nuc",
+                "class")
+yeast_data <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/yeast.data",
+                         delim = "  ",
+                         col_names = columnnames)
+print(yeast_data)
+yeast_data_tbl <- as_tibble(yeast_data)
+print(yeast_data_tbl)
+
+#2 - Remove seq_name and nuc columns from tibble.
+yeast_data_tbl |>
+  select(-seq_name, -nuc) |>
+#add mean and median columns corresponding to each numeric variable.
+  mutate(across(where(is.numeric), list(mean = mean, median = median), na.rm = TRUE, .names = "{.col}_{.fn}"))
+  
+  
+```
+
+#Task 2: Combining Excel and Delimited Data
+
+```{r}
+
+#1
+library(readxl)
+#import raw excel data, just the first sheet.
+white_wine <- read_excel("white-wine.xlsx", 
+                         sheet = excel_sheets("white-wine.xlsx")[1])
+white_wine_tbl <- as_tibble(white_wine)
+view(white_wine_tbl)
+
+print(white_wine_tbl)
+
+
+#2
+#import second sheet of raw excel data with all variable names and info.
+white_wine_2nd <- read_excel("white-wine.xlsx",
+                             sheet = excel_sheets("white-wine.xlsx")[2])
+#make column names of RData object as variables from 2nd sheet.
+colnames(white_wine) <- white_wine_2nd$Variables
+
+#3
+#add additional column as per HW requirements.
+white_wine_tbl$Type = c("White")
+
+white_wine$Type = c("White")
+
+
+
+#4 - do same as above to red wine raw delimited file.
+red_wine <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/red-wine.csv",
+                       delim = ";")
+colnames(red_wine) <- white_wine_2nd$Variables  
+
+red_wine$Type = c("Red")
+
+#5 - combine the two datasets together
+wines_overall <- bind_rows(white_wine, red_wine)
+print(wines_overall)
+
+#6 through 9
+library(dplyr)
+filtered_wines_overall <- wines_overall |>
+  #arrange quality variable from descending order, largest to smallest.
+  arrange(desc(wines_overall$quality)) |>
+  #filter data with quality < 6.5 and alcohol < 132.
+  filter(wines_overall$quality > 6.5, wines_overall$alcohol < 132) |>
+  #Select only certain variables.
+  select(contains("acid"),contains("alcohol"), "Type", "quality") |>
+  group_by(quality) |>
+  #add mean and standard deviation of alcohol variable for each quality setting.  To do this, need to first use group_by function as shown in one line above.
+  mutate(wine_alcohol_mean = mean(alcohol),
+         wine_alcohol_sd = sd(alcohol))
+
+  print(filtered_wines_overall)
+```
+
+#Task 3 - Database Practice
+
+```{r}
+library(DBI)
+library(RSQLite)
+
+#1 - Connect to database
+lahman_db <- dbConnect(RSQLite::SQLite(), "lahman.db")
+dbListTables(lahman_db)
+
+#2 -  return all data from Teams table in the year 2015.
+tbl(lahman_db, "Teams") |>
+  filter(yearID == 2015)
+
+#3 -  Use SQL to do the same as shown in question 2.
+lahman_db2 <- dbConnect(RSQLite::SQLite(), "lahman.db")
+
+tbl(lahman_db2, sql(
+  "SELECT 'yearID', 'playerID', 'teamID', 'lgID' 
+  FROM 'Teams' 
+  WHERE ('yearID' = 2015.0)")
+  )
+  
+#4 - Return all players from Hall of Fame table.
+lahman_db_modified <- tbl(lahman_db, "HallOfFame") |>
+  select(playerID, yearID, category) |>
+print(lahman_db_modified)
+
+#5 - Combine People table with previously modified HallOfFame table.
+lahman_db_join <- tbl(lahman_db, "People") |>
+left_join(lahman_db_modified, tbl(lahman_db,"People"),
+          by = join_by(playerID == playerID)) |>
+  collect() |>
+  select(playerID, yearID, nameFirst, nameLast)
+print(lahman_db_join)
+
+#6 - Using chaining to select certain variables in table, group by one variable, and summarize win/loss ratio.
+lahman_db_managers <- tbl(lahman_db, "Managers") |>
+      select(playerID, G, W, L) |>
+      group_by(playerID) |>
+      summarize(G_managed = sum(G, na.rm = TRUE),
+             Total_W = sum(W, na.rm = TRUE),
+             Total_L = sum(L, na.rm = TRUE)) |>
+      collect() |>
+      mutate(win_loss_percentage = Total_W/G_managed) |>
+      arrange(desc(win_loss_percentage))
+print(lahman_db_managers)
+
+#7 - returning all variables from last two questions.
+lahman_total_join <- full_join(lahman_db_managers, lahman_db_join, 
+                               by = join_by(playerID == playerID)) |>
+                      select(everything())
+                                 
+print(lahman_total_join)                               
+
+```
